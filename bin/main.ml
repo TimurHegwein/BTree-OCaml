@@ -1,31 +1,10 @@
 type node = 
-    | Empty_Node
     | Leaf of int list
     | Node of int list * node list
 
 type btree = Tree of int * node
 
-
-let test1 = Tree(1, 
-    Node([3; 7], 
-            [Node([1; 2], [Empty_Node; Empty_Node; Empty_Node])
-            ; Node([4; 5], [Empty_Node; Empty_Node; Empty_Node])
-            ; Node([8; 9], [Empty_Node; Empty_Node; Empty_Node])]
-        )
-    )
-
-let test_deeper = Tree(1, 
-    Node([5], 
-            [Node([2], 
-                [Node([1], [Empty_Node; Empty_Node])
-                ; Node([3], [Empty_Node; Empty_Node])]
-            )
-            ; Node([9], 
-                [Node([8], [Empty_Node; Empty_Node])
-                ; Node([10], [Empty_Node; Empty_Node])]
-            )]
-        )
-    )
+let init_tree k = Tree (k, Leaf([]))
 
 let lookup tree x =
     let Tree (_, root) = tree in
@@ -33,7 +12,6 @@ let lookup tree x =
     let rec search node = 
         match node with
         | Leaf (vals) -> List.exists (fun t -> t = x) vals
-        | Empty_Node -> false
         | Node (vals, children) -> 
             let rec iter_list vals children =
                 match vals, children with
@@ -56,8 +34,6 @@ let lookup tree x =
     in 
     (* Helper call*)
     search root
-
-
 let insert_list l value = 
     let rec aux l value acc =
         match l with
@@ -75,8 +51,6 @@ let update_idx l new_val idx =
     let (_, acc) = List.fold_left (fun (i, acc) a -> if i = idx then (i+1, new_val::acc) else (i+1, a::acc)) (0, []) l
     in
     List.rev acc  
-
-let test_l = [1; 2; 4]
 
 (* Split Funktion
     returns (left_node, [median], right_node)
@@ -109,15 +83,14 @@ let rec split node two_k=
         )
     in
     match node with
-    | Empty_Node -> failwith "Invalid"
     | Leaf (vals) -> (
         let (left, median, right) = split_vals vals 0 ([], [], []) in
-        (Leaf (left), median, Leaf (right))
+        (Leaf (List.rev left), median, Leaf (List.rev right))
     )
     | Node (vals, childs) -> (
         let (left, median, right) = split_vals vals 0 ([], [], []) in
         let (left_ch, right_ch) = split_childs childs 0 ([], []) in
-        (Node (left, left_ch), median, Node (right, right_ch))
+        (Node (List.rev left, left_ch), median, Node (List.rev right, right_ch))
     )
     
 (* uses median and the nodes to create a new (updated) upper node*)
@@ -153,7 +126,6 @@ let handle_split (left, median, right) vals_up children_up =
 
 let rec insert_aux node value k =
     match node with
-    | Empty_Node -> node (*should never be reached*)
     | Leaf (vals) ->
         Leaf (insert_list vals value)
     | Node (vals_up, children_up) -> 
@@ -176,7 +148,6 @@ let rec insert_aux node value k =
         let two_k = 2 * k 
         in
         match ret_node with
-        | Empty_Node -> ret_node
         | Leaf (vals) -> (
             if List.length vals > two_k then 
                 handle_split (split (Leaf (vals)) two_k) vals_up children_up
@@ -186,32 +157,25 @@ let rec insert_aux node value k =
                 handle_split (split (Node (vals, children)) two_k) vals_up children_up
             else Node (vals_up, (update_idx children_up ret_node child_idx))
         )
-     
 let insert tree x =
     let Tree (k, root) = tree in
-    (* Init root node*)
-    if root = Empty_Node then
-        let new_root = Leaf ([x]) in
-        Tree (k, new_root)
-    else
-        let new_root = (insert_aux root x k) in
-        (* Muss die Wurzel geteilt werden ?*)
-        let new_root = 
-            match new_root with
-        | Empty_Node -> new_root
-        | Leaf (vals) -> (
-            if List.length vals > 2 * k then
-                let (left, median, right) = split (Leaf (vals)) (2*k) in
-                Node (median, [left; right])
-            else
-                Leaf (vals)
-            )
-        | Node (vals, children) -> (
-            if List.length vals > 2 * k then
-                let (left, median, right) = split (Node (vals, children)) (2*k) in
-                Node (median, [left; right])
-            else
-                Node (vals, children)
-            )
-        in
-        Tree (k, new_root)
+    let new_root = (insert_aux root x k) in
+    (* Muss die Wurzel geteilt werden ?*)
+    let new_root = 
+        match new_root with
+    | Leaf (vals) -> (
+        if List.length vals > 2 * k then
+            let (left, median, right) = split (Leaf (vals)) (2*k) in
+            Node (median, [left; right])
+        else
+            Leaf (vals)
+        )
+    | Node (vals, children) -> (
+        if List.length vals > 2 * k then
+            let (left, median, right) = split (Node (vals, children)) (2*k) in
+            Node (median, [left; right])
+        else
+            Node (vals, children)
+        )
+    in
+    Tree (k, new_root)
