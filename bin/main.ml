@@ -1,8 +1,17 @@
+module type OrderedType = sig
+  type t
+  val compare : t -> t -> int
+end
+
+module MakeBTree (Ord : OrderedType) = struct
+type element = Ord.t
+
 type node = 
-    | Leaf of int list
-    | Node of int list * node list
+    | Leaf of element list
+    | Node of element list * node list
 
 type btree = Tree of int * node
+
 
 let init_tree k = Tree (k, Leaf([]))
 
@@ -11,7 +20,7 @@ let lookup tree x =
         (* Search Helper Function*)
     let rec search node = 
         match node with
-        | Leaf (vals) -> List.exists (fun t -> t = x) vals
+        | Leaf (vals) -> List.exists (fun t -> Ord.compare t x = 0) vals
         | Node (vals, children) -> 
             let rec iter_list vals children =
                 match vals, children with
@@ -19,11 +28,12 @@ let lookup tree x =
                 | _::_, [] -> failwith ("Invalid State: More vals then children")
                 | [], last_ch::invalid_rest -> if invalid_rest = [] then search last_ch else failwith "More then one Child left even though no vals"
                 | cur_val::rest_val, cur_ch::rest_ch -> (
-                    if x = cur_val then
+                    let cmp = Ord.compare x cur_val in
+                    if cmp = 0 then
                         true
-                    else if x > cur_val then
+                    else if cmp > 0 then
                         iter_list rest_val rest_ch
-                    else if x < cur_val then
+                    else if cmp < 0 then
                         search cur_ch
                     else 
                         failwith "Invalid state"
@@ -34,12 +44,14 @@ let lookup tree x =
     in 
     (* Helper call*)
     search root
+
 let insert_list l value = 
     let rec aux l value acc =
         match l with
         | [] -> List.rev (value::acc)
         | x::xs -> (
-            if x > value then 
+            let cmp = Ord.compare x value in
+            if cmp > 0 then 
                 List.concat [List.rev acc; value :: [x]; xs]
             else
                 aux xs value (x::acc)
@@ -90,7 +102,7 @@ let rec split node two_k=
     | Node (vals, childs) -> (
         let (left, median, right) = split_vals vals 0 ([], [], []) in
         let (left_ch, right_ch) = split_childs childs 0 ([], []) in
-        (Node (List.rev left, left_ch), median, Node (List.rev right, right_ch))
+        (Node (List.rev left, List.rev left_ch), median, Node (List.rev right, List.rev right_ch))
     )
     
 (* uses median and the nodes to create a new (updated) upper node*)
@@ -136,9 +148,10 @@ let rec insert_aux node value k =
             | _::_, [] -> failwith "Invalid State should not be reached"
             | [], x::xs -> if xs = [] then (insert_aux x value k), idx else failwith "Too many children should not be reached"
             | cur_val::rest_val, cur_ch::rest_ch -> (
-                if cur_val = value then 
+                let cmp = Ord.compare cur_val value in
+                if cmp = 0 then 
                     failwith "Value is already inserted"
-                else if cur_val > value then
+                else if cmp > 0 then
                     (insert_aux cur_ch value k), idx
                 else (* cur_val < value *)
                     helper rest_val rest_ch (idx + 1)
@@ -179,3 +192,37 @@ let insert tree x =
         )
     in
     Tree (k, new_root)
+
+end
+
+
+(* --- Test-Bereich --- *)
+
+(* 1. Den Baum für Integers erstellen *)
+module IntBTree = MakeBTree(Int)
+
+(* 2. Test-Ablauf definieren *)
+let run_test () =
+  let k = 2 in
+  let tree = IntBTree.init_tree k in
+  
+  Printf.printf "Starte Test mit k=%d...\n" k;
+  
+  (* Mehrere Werte einfügen *)
+  let values = [10; 20; 5; 15; 30; 25; 40] in
+  let final_tree = List.fold_left (fun acc v -> 
+    Printf.printf "Füge %d ein...\n" v;
+    IntBTree.insert acc v
+  ) tree values in
+
+  (* Prüfen, ob alle Werte gefunden werden *)
+  Printf.printf "\nPrüfe Werte:\n";
+  List.iter (fun v -> 
+    let found = IntBTree.lookup final_tree v in
+    Printf.printf "Wert %d gefunden? %b\n" v found
+  ) (values @ [99; 0]); (* 99 und 0 sollten false sein *)
+  
+  Printf.printf "\nTest abgeschlossen.\n"
+
+(* 3. Den Test tatsächlich ausführen *)
+let () = run_test ()
