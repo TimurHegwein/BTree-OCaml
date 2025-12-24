@@ -27,6 +27,40 @@ type insert_res =
 
 let init_tree k = Tree (k, Leaf([]))
 
+(* Hilfsunktionen *)
+(* insert_list: Sortiert einfügen von value in Liste l *)
+let insert_list l value = 
+    let rec aux l value acc =
+        match l with
+        | [] -> List.rev (value::acc)
+        | x::xs -> (
+            let cmp = Ord.compare x value in
+            if cmp > 0 then 
+                List.concat [List.rev acc; value :: [x]; xs]
+            else
+                aux xs value (x::acc)
+        )
+    in
+    aux l value []
+
+(* Split der Liste l an Index idx, Rückgabe: (links: list, median: element, rechts:list) *)
+let split_idx l idx = 
+    let rec aux l i acc =
+        match l with
+        | [] -> List.rev acc, None, []
+        | x :: xs -> (
+            if i = idx then (List.rev acc, Some x, xs)
+            else aux xs (i+1) (x::acc) 
+        )
+    in
+    let (a, med, b) =  aux l 0 [] 
+    in
+    match med with
+    | Some m ->(a, m, b)
+    | None -> failwith "Split hat nicht funktioniert"
+
+(* Hauptfunktionen *)
+(* Suche nach Wert im Baum *)
 let lookup tree x =
     let Tree (_, root) = tree in
     (* Search Helper Function*)
@@ -52,92 +86,21 @@ let lookup tree x =
     (* Helper call*)
     search root
 
-let insert_list l value = 
-    let rec aux l value acc =
-        match l with
-        | [] -> List.rev (value::acc)
-        | x::xs -> (
-            let cmp = Ord.compare x value in
-            if cmp > 0 then 
-                List.concat [List.rev acc; value :: [x]; xs]
-            else
-                aux xs value (x::acc)
-        )
-    in
-    aux l value []
-    
-
-let split_idx l idx = 
-    let rec aux l i acc =
-        match l with
-        | [] -> List.rev acc, None, []
-        | x :: xs -> (
-            if i = idx then (List.rev acc, Some x, xs)
-            else aux xs (i+1) (x::acc) 
-        )
-    in
-    let (a, med, b) =  aux l 0 [] 
-    in
-    match med with
-    | Some m ->(a, m, b)
-    | None -> failwith "Split hat nicht funktioniert"
-
-(* Split Funktion
-    returns (left_node, [median], right_node)
-*)
-let rec split node two_k= 
-    let median_idx = (two_k + 1) / 2 in
-    let median_idx2 = (two_k + 2) / 2 in
-    let rec split_vals vals i acc = 
-        let (left, median ,right) = acc in
-        match vals with
-        | [] -> acc
-        | x::xs -> (
-            if i < median_idx then
-                split_vals xs (i + 1) (x::left, median,right)
-            else if i > median_idx then
-                split_vals xs (i + 1) (left, median,x::right)
-            else split_vals xs (i + 1) (left, x::median ,right)
-        )
-    in
-    let rec split_childs childs i acc = 
-        let (left, right) = acc in
-        match childs with
-        | [] -> acc
-        | x::xs -> (
-            if i < median_idx2 then
-                split_childs xs (i + 1) (x::left,right)
-            else if i > median_idx then
-                split_childs xs (i + 1) (left,x::right)
-            else split_childs  xs (i + 1) (left ,right)
-        )
-    in
-    match node with
-    | Leaf (vals) -> (
-        let (left, median, right) = split_vals vals 0 ([], [], []) in
-        (Leaf (List.rev left), median, Leaf (List.rev right))
-    )
-    | Node (vals, childs) -> (
-        let (left, median, right) = split_vals vals 0 ([], [], []) in
-        let (left_ch, right_ch) = split_childs childs 0 ([], []) in
-        (Node (List.rev left, List.rev left_ch), median, Node (List.rev right, List.rev right_ch))
-    )
-    
+(* Rekursive Logik für den Insert*)
+(**)
 let rec insert_aux node x k =
     let two_k = 2 * k in
     match node with
     | Leaf vals ->
         let new_vals = insert_list vals x in
+        (* Splitkontrolle *)
         if List.length new_vals > two_k then
-            (* Split *)
             let (l_vals, median, r_vals) = split_idx new_vals k in
             Split (Leaf l_vals, median, Leaf r_vals)
-        else
-            (* Kein Split nötig *)
-            Stay (Leaf new_vals)
+        else Stay (Leaf new_vals)
 
     | Node (vals, children) -> 
-        (* "Suche" des Kind index, Fehler falls es das Element gibt*)
+        (* Suche des Kind Index, in den das Element muss, Fehler falls es das schon Element im Baum ist *)
         let rec find_ch_idx i vals = 
             match vals with
             | t::rt -> (
@@ -149,31 +112,42 @@ let rec insert_aux node x k =
         in
         let idx = find_ch_idx 0 vals in
 
+        (* in target wird value eingefügt *)
         let (left_childs, target, right_childs) = split_idx children idx in
 
+        (* retnode ist das Ergebnis des Einfügens *)
         let ret_node = insert_aux target x k in
-
         match ret_node with
+        (* Falls kein Split nötig war: Einfach target druch den neuen node ersetzen *)
         | Stay new_node -> Stay (Node (vals, left_childs @ [new_node] @ right_childs))
-        (* Umgang mit Split *)
+    
+        (* In target war ein Split nötig, nun könnte es sein, dass dieser Knoten auch geteilt werden muss *)
         | Split (l, m, r) -> 
             (
+                (* Einfügen des Medians und enstandener Children aus target *)
                 let new_vals = insert_list vals m in
                 let new_children = left_childs @ [l; r] @ right_childs in
 
+                (* Kontrolle ob dieser Knoten geteilt werden muss *)
                 let lenght_vals = List.length new_vals in
-
                 if lenght_vals > two_k then
                     let (l_vals, m_up, r_vals)= split_idx new_vals k in
+
+                    (* Aufteilen der Kinder (genaue Erklärung):
+                    - Bei n values gibt es n+1 Kinder
+                    - Bei 2k + 1 values also 2k+2 = 2 (k+1) Kinder
+                    -> Somit split bei k+1
+                    -> Median gehört zur rechten Liste
+                    *)
                     let (l_ch, m, r_ch) = split_idx new_children (k+1) in
                     let r_ch = m::r_ch in
                     
                     Split (Node(l_vals, l_ch), m_up, Node(r_vals, r_ch))
 
-                else 
-                    Stay (Node (new_vals, new_children))
+                else Stay (Node (new_vals, new_children))
             )
-           
+   
+(* Aufruf von Insert und ggf. Wurzel Split*)
 let insert tree x =
     let Tree (k, root) = tree in
     let new_root = (insert_aux root x k) in
@@ -188,8 +162,6 @@ let insert tree x =
 end
 
 
-(* --- Test-Bereich --- *)
-
 (* 1. Den Baum für Integers erstellen *)
 module IntBTree = MakeBTree(Int)
 
@@ -201,7 +173,7 @@ let run_test () =
   Printf.printf "Starte Test mit k=%d...\n" k;
   
   (* Mehrere Werte einfügen *)
-  let values = [10; 20; 5; 15; 30; 25; 40] in
+  let values = [30; 25; 40; 200; 100; 889; 10; 20; 5; 15; 2910; 1039; 12; 81; 301; 9193] in
   let final_tree = List.fold_left (fun acc v -> 
     Printf.printf "Füge %d ein...\n" v;
     IntBTree.insert acc v
