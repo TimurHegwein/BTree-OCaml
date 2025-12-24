@@ -3,14 +3,6 @@ module type OrderedType = sig
   val compare : t -> t -> int
 end
 
-module IntKV = struct
-  type t = { key : int; value : int }
-
-  (* Vergleichsfunktion der Keys *)
-  let compare a b = Int.compare a.key b.key
-end
-
-
 module MakeBTree (Ord : OrderedType) = struct
 type element = Ord.t
 
@@ -60,7 +52,7 @@ let split_idx l idx =
     | None -> failwith "Split hat nicht funktioniert"
 
 (* Hauptfunktionen *)
-(* Suche nach Wert im Baum *)
+(* Suche nach Wert im Baum -> true/false *)
 let lookup tree x =
     let Tree (_, root) = tree in
     (* Search Helper Function*)
@@ -74,6 +66,32 @@ let lookup tree x =
                 | cur_val::rest_val, cur_ch::rest_ch -> (
                     let cmp = Ord.compare x cur_val in
                     if cmp = 0 then true
+                    else if cmp < 0 then search cur_ch
+                    (* cmp > 0 *)    
+                    else iter_list rest_val rest_ch
+                )
+                | _ -> failwith "Invalid state: Sollte nicht vorkommen (bspw. zu viele oder wenige Kinder etc.)"
+            in
+            (* Aufruf der Suche*)
+            iter_list vals children
+    in 
+    (* Helper call*)
+    search root
+
+(* lookup -> gefundenert Wert*)
+let lookup_value tree x =
+    let Tree (_, root) = tree in
+    (* Search Helper Function*)
+    let rec search node = 
+        match node with
+        | Leaf (vals) -> List.find_opt (fun t -> Ord.compare t x = 0) vals
+        | Node (vals, children) -> 
+            let rec iter_list vals children =
+                match vals, children with
+                | [], [last_ch]-> search last_ch
+                | cur_val::rest_val, cur_ch::rest_ch -> (
+                    let cmp = Ord.compare x cur_val in
+                    if cmp = 0 then Some (cur_val)
                     else if cmp < 0 then search cur_ch
                     (* cmp > 0 *)    
                     else iter_list rest_val rest_ch
@@ -162,31 +180,56 @@ let insert tree x =
 end
 
 
-(* 1. Den Baum für Integers erstellen *)
-module IntBTree = MakeBTree(Int)
 
-(* 2. Test-Ablauf definieren *)
-let run_test () =
-  let k = 2 in
-  let tree = IntBTree.init_tree k in
-  
-  Printf.printf "Starte Test mit k=%d...\n" k;
-  
-  (* Mehrere Werte einfügen *)
-  let values = [30; 25; 40; 200; 100; 889; 10; 20; 5; 15; 2910; 1039; 12; 81; 301; 9193] in
-  let final_tree = List.fold_left (fun acc v -> 
-    Printf.printf "Füge %d ein...\n" v;
-    IntBTree.insert acc v
-  ) tree values in
 
-  (* Prüfen, ob alle Werte gefunden werden *)
-  Printf.printf "\nPrüfe Werte:\n";
-  List.iter (fun v -> 
-    let found = IntBTree.lookup final_tree v in
-    Printf.printf "Wert %d gefunden? %b\n" v found
-  ) (values @ [99; 0]); (* 99 und 0 sollten false sein *)
-  
-  Printf.printf "\nTest abgeschlossen.\n"
+module IntKV = struct
+  type t = { key : int; value : int }
 
-(* 3. Den Test tatsächlich ausführen *)
-let () = run_test ()
+  (* Vergleichsfunktion *)
+  let compare a b = Int.compare a.key b.key
+end
+
+module IntKVBtree = MakeBTree(IntKV)
+module IntBtree = MakeBTree(Int)
+
+(* Beispiel: Studenten und ihre Noten *)
+let run_main () =
+    let k = 4 in
+    let tree = IntKVBtree.init_tree k in
+    let tree_for_unique_mats = IntBtree.init_tree k in
+    let num_students = 50 in
+
+    let _ = Random.self_init () in
+
+    let rec get_unique_mat tree_for_unique_mats =
+        let mat = Random.int 51 in 
+        if IntBtree.lookup tree_for_unique_mats mat then get_unique_mat tree_for_unique_mats
+        else (mat, IntBtree.insert tree_for_unique_mats mat)
+    in
+    let rec fill_tree tree tree_for_unique_mats num_students =
+        if num_students = 0 then tree
+        else 
+            let (mat, tree_for_unique_mats) = get_unique_mat tree_for_unique_mats in
+            let grade = 1 + Random.int 6 in
+
+            fill_tree (IntKVBtree.insert tree {key = mat; value = grade}) tree_for_unique_mats (num_students-1)
+
+    in
+    let tree = fill_tree tree tree_for_unique_mats num_students in
+    
+    let tests = 20 in
+    Printf.printf "Starte lookups mit t=%d zufälligen keys \n" tests;
+
+    let rec test tree num_tests =
+        if num_tests = 0 then Printf.printf "\nTest abgeschlossen.\n"
+        else
+            let rndm_mat = Random.int 51 in
+            let student = IntKVBtree.lookup_value tree {key=rndm_mat; value=0} in
+
+            match student with
+            | None -> Printf.printf "Gesuchter key: k=%d NICHT Gefunden\n" rndm_mat; test tree (num_tests - 1)
+            | Some (s) -> Printf.printf "Gesuchter key: k=%d Gefunden! Note: s=%d\n" rndm_mat s.value; test tree (num_tests - 1)  
+        in
+    test tree 20
+
+let () = run_main ()
