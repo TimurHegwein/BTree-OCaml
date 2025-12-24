@@ -17,27 +17,22 @@ let init_tree k = Tree (k, Leaf([]))
 
 let lookup tree x =
     let Tree (_, root) = tree in
-        (* Search Helper Function*)
+    (* Search Helper Function*)
     let rec search node = 
         match node with
         | Leaf (vals) -> List.exists (fun t -> Ord.compare t x = 0) vals
         | Node (vals, children) -> 
             let rec iter_list vals children =
                 match vals, children with
-                | [], [] -> false
-                | _::_, [] -> failwith ("Invalid State: More vals then children")
-                | [], last_ch::invalid_rest -> if invalid_rest = [] then search last_ch else failwith "More then one Child left even though no vals"
+                | [], [last_ch]-> search last_ch
                 | cur_val::rest_val, cur_ch::rest_ch -> (
                     let cmp = Ord.compare x cur_val in
-                    if cmp = 0 then
-                        true
-                    else if cmp > 0 then
-                        iter_list rest_val rest_ch
-                    else if cmp < 0 then
-                        search cur_ch
-                    else 
-                        failwith "Invalid state"
+                    if cmp = 0 then true
+                    else if cmp < 0 then search cur_ch
+                    (* cmp > 0 *)    
+                    else iter_list rest_val rest_ch
                 )
+                | _ -> failwith "Invalid state: Sollte nicht vorkommen (bspw. zu viele oder wenige Kinder etc.)"
             in
             (* Aufruf der Suche*)
             iter_list vals children
