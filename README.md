@@ -13,13 +13,13 @@ Stelle sicher, dass [OCaml](https://ocaml.org/) und das Build-System [Dune](http
 1. **Repository klonen:**
    ```bash
    git clone https://github.com/TimurHegwein/BTree-OCaml 
-   cd btree
+   cd BTree-OCaml
    ```
 
 2. **Kompilieren und ausführen:**
    Das Projekt enthält eine Demo-Anwendung in der `main.ml`, die automatisch über Dune gestartet werden kann:
    ```bash
-   dune exec ./main.exe
+   dune exec btree
    ```
 
 3. **Aufräumen:**
