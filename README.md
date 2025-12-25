@@ -1,36 +1,61 @@
+Hier ist die überarbeitete `README.md`, optimiert für ein GitHub-Repository. Sie deckt den Prozess vom Klonen bis zur Ausführung ab und erklärt die technischen Konzepte.
 
 ---
 
-# OCaml B-Tree Functor
+# OCaml B-Tree Functor Implementation
 
-Diese Implementierung bietet einen funktionalen, selbstbalancierenden B-Baum mit einstellbarem Grad $k$.
+Diese Repositorium enthält eine rein funktionale, selbstbalancierende Implementierung eines **B-Baums** in OCaml. Mithilfe von Funktoren kann die Datenstruktur für beliebige Datentypen verwendet werden.
 
-## Installation & Ausführung
+## 🚀 Installation & Ausführung
 
-1. **Voraussetzung:** OCaml und Dune müssen installiert sein.
-2. **Dateien anlegen:** Speichere den Code als `main.ml`. Erstelle im selben Ordner eine Datei namens `dune`:
-   ```lisp
-   (executable (name main))
+Stelle sicher, dass [OCaml](https://ocaml.org/) und das Build-System [Dune](https://dune.build/) installiert sind (am einfachsten via `opam`).
+
+1. **Repository klonen:**
+   ```bash
+   git clone https://github.com/TimurHegwein/BTree-OCaml 
+   cd btree
    ```
-3. **Starten:**
+
+2. **Kompilieren und ausführen:**
+   Das Projekt enthält eine Demo-Anwendung in der `main.ml`, die automatisch über Dune gestartet werden kann:
    ```bash
    dune exec ./main.exe
    ```
 
-## Details zur Implementierung
+3. **Aufräumen:**
+   Um die Build-Artefakte zu entfernen:
+   ```bash
+   dune clean
+   ```
 
-### Struktur
-- **Funktor-basiert:** `MakeBTree` erwartet ein Modul mit Typ `t` und einer `compare`-Funktion.
-- **Parametrisierbar:** Der Grad $k$ wird bei `init_tree k` festgelegt. Ein Knoten fasst maximal $2k$ Elemente.
-- **Unveränderlich:** Der Baum ist rein funktional; jede Operation gibt einen neuen Baum zurück.
+## 🛠 Details zur Implementierung
 
-### Algorithmus (Einfügen)
-Die Kernlogik liegt in der rekursiven Funktion `insert_aux`:
-- **`insert_res` Typ:** Steuert das Backtracking. Ein Knoten gibt entweder `Stay` (keine Änderung der Struktur oberhalb) oder `Split` (Median und zwei neue Teilbäume müssen nach oben gereicht werden) zurück.
-- **Balancierung:** Überschreitet eine Liste die Länge $2k$, wird sie mittels `split_idx` am Median geteilt.
-- **Wurzel-Split:** Falls die Wurzel geteilt wird, wird in der `insert`-Funktion automatisch eine neue Ebene (neue Wurzel) erstellt, wodurch der Baum wächst.
+### Struktur & Funktoren
+- **Funktor-basiert:** Über `module MakeBTree (Ord : OrderedType)` wird der Baum instanziiert. Er benötigt lediglich einen Typ `t` und eine `compare`-Funktion.
+- **Parametrisierbar:** Der Grad $k$ des Baums wird bei der Initialisierung (`init_tree k`) festgelegt. Ein Knoten fasst nach der B-Baum-Definition maximal $2k$ Elemente.
+- **Immutability:** Die Implementierung ist rein funktional. Jede Operation lässt den bestehenden Baum unverändert und gibt eine neue, aktualisierte Struktur zurück.
+
+### Algorithmus (Einfügen & Balancierung)
+Die Kernlogik des Einfügens ist in `insert_aux` implementiert:
+- **`insert_res` Typ:** Steuert das Backtracking während der Rekursion. Ein Knoten liefert entweder:
+    - `Stay`: Das Element wurde eingefügt, die Invarianten sind gewahrt.
+    - `Split`: Der Knoten ist übergelaufen. Der Median sowie die zwei neuen Teilbäume werden an die nächsthöhere Ebene gereicht.
+- **Wurzel-Wachstum:** Falls die Wurzel geteilt werden muss (`Split`), wird in der Hauptfunktion `insert` eine neue Ebene oberhalb der alten Wurzel erstellt. Dies ist der einzige Mechanismus, durch den der B-Baum an Höhe gewinnt.
 
 ### Wichtige Funktionen
-- `lookup / lookup_value`: Logarithmische Suche nach Schlüsseln.
-- `insert`: Fügt Elemente sortiert ein; verhindert Duplikate per `failwith`.
-- `dune clean`: Bereinigt Build-Artefakte vor dem Teilen des Projekts.
+- `lookup` / `lookup_value`: Logarithmische Suche ($O(\log n)$).
+- `insert`: Fügt Elemente sortiert ein. **Hinweis:** Duplikate führen zum Abbruch des Programms (`failwith`).
+- `split_idx`: Hilfsfunktion zur exakten Teilung von Listen am Median während eines Knoten-Splits.
+
+## 📝 Beispiel
+Das mitgelieferte Beispiel in `run_main` zeigt die Verwendung mit einem Key-Value-Paar (Studenten-Matrikelnummern und Noten):
+
+```ocaml
+module IntKV = struct
+  type t = { key : int; value : int }
+  let compare a b = Int.compare a.key b.key
+end
+
+module IntKVBtree = MakeBTree(IntKV)
+let tree = IntKVBtree.init_tree 4 (* Baum mit Grad k=4 *)
+```
