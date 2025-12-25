@@ -17,6 +17,8 @@ Obwohl das Projekt die Standard-Dune-Struktur nutzt, ist die Implementierung akt
 
 Stelle sicher, dass [OCaml](https://ocaml.org/) und das Build-System [Dune](https://dune.build/) installiert sind (am einfachsten via `opam`).
 
+Um die Hürde für eigene Experimente niedrig zu halten, ist die gesamte Datenstruktur derzeit in einer einzigen Datei implementiert. Dies ermöglicht es dir, schnell eigene Beispiele zu ergänzen oder den Code für interaktive Tests direkt in `utop` zu laden.
+
 1. **Repository klonen:**
    ```bash
    git clone https://github.com/TimurHegwein/BTree-OCaml.git
